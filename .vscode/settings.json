@@ -1,0 +1,6 @@
+{
+    "deepscan.ignoreConfirmWarning": true,
+    "files.associations": {
+        "xstring": "cpp"
+    }
+}

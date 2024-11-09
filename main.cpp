@@ -62,6 +62,15 @@ int main()
         std::deque<std::pair<std::string, int>> call_stack;
         std::pair<std::string, int> current_stack;
 
+        /*********************** cache variables declaration***************** */
+
+            bool cache_is_on = false;
+            std::string reqs[5];
+            cache::cache_table * CACHE = nullptr;
+
+
+
+        /******************************************************************* */
 
         std::vector<std::string> available_cmds = {"print text","show-stack","run","step","break","del break","load","exit","regs", "mem count","clear","cls"};
         /************************************************************************************************** */
@@ -70,13 +79,97 @@ int main()
         {
 
             std::vector<std::string> input_tokens = input_collector();
-            if (input_tokens[0] == "exit")
+
+        /************************************************** */
+
+        if(input_tokens[0]=="cache_sim" && input_tokens[1]=="enable")
+        {
+                cache_is_on=true;
+                
+                std::ifstream config_file;
+
+                config_file.open(input_tokens[2]);
+
+                std::string temps;
+               
+                int i=0;
+                while(std::getline(config_file,temps))
+                {
+                    if(i>=5)
+                    {
+                        throw std::runtime_error("config_file problem");
+                    }
+                    reqs[i] = temps;
+                    i++;  
+                }
+
+                CACHE = new cache::cache_table(std::stoi(reqs[0]),std::stoi(reqs[1]),std::stoi(reqs[2]),reqs[3],reqs[4]);
+                
+                
+        }
+
+
+
+       else if(input_tokens[0]=="cache_sim" && input_tokens[1]=="disable")
+       {
+
+            if(cache_is_on)
+            {
+
+                delete CACHE;
+
+            }
+            cache_is_on =false;
+
+       }
+
+       else if(input_tokens[0]=="cache_sim" && input_tokens[1]=="status")
+       {
+            if(cache_is_on)
+            {
+                helpers::print_cache_stats(CACHE,reqs);
+            }
+            else
+            {
+                std::cout<<"cache simulation is on!!"<<std::endl;
+            }
+       }
+        else if(input_tokens[0]=="cache_sim" && input_tokens[1]=="invalidate")
+        {
+            if(cache_is_on)
+            {
+                CACHE->invalidate(); 
+                //  !!!!!!!!  its not enough ( in wb policy first handel dirty bits and then write back them)
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        /***************************************************************** */
+
+
+
+
+           else if (input_tokens[0] == "exit")
             {
                 std::cout << "Exited the simulator" << std::endl;
                 break;
             }
 
-            else if (input_tokens[0] == "load" and input_tokens.size() == 2)
+            else if (input_tokens[0] == "load" && input_tokens.size() == 2)
             {
                 is_loaded = true;
 
@@ -112,7 +205,7 @@ int main()
 
             // duplicates as of know
             /***********************   regs ******************************* */
-            else if (input_tokens[0] == "regs" and (input_tokens.size() == 1 or input_tokens.size()==2))
+            else if (input_tokens[0] == "regs" && (input_tokens.size() == 1 || input_tokens.size()==2))
             {
                 if (!is_loaded)
                 {
@@ -145,7 +238,7 @@ int main()
                             std::cout<<regs[std::bitset<5>(std::stoull(input_tokens[1])).to_string()]<<std::endl;
                         }
                     }
-                    else
+                    else    
                     {
                         std::cout<<"No such command "<<std::endl;
                     }
@@ -156,7 +249,7 @@ int main()
             }
 
             /***********************   print text ******************************* */
-            else if (input_tokens[0] == "print" and input_tokens[1] == "text")
+            else if (input_tokens[0] == "print" && input_tokens[1] == "text")
             {
                 if (!is_loaded)
                 {
@@ -168,7 +261,7 @@ int main()
             }
 
             /***********************   run ******************************* */
-            else if (input_tokens[0] == "run" and input_tokens.size() == 1)
+            else if (input_tokens[0] == "run" && input_tokens.size() == 1)
             {
                 just_started = false;
 
@@ -189,7 +282,7 @@ int main()
 
             /***********************   break  ******************************* */
 
-            else if (input_tokens[0] == "break" and input_tokens.size() == 2)
+            else if (input_tokens[0] == "break" && input_tokens.size() == 2)
             {
 
                 if (!is_loaded)
@@ -227,7 +320,7 @@ int main()
 
             /***********************   del break ******************************* */
 
-            else if (input_tokens[0] == "del" and input_tokens[1] == "break" and input_tokens.size() == 3)
+            else if (input_tokens[0] == "del" && input_tokens[1] == "break" && input_tokens.size() == 3)
             {
 
                 if (!is_loaded)
@@ -239,7 +332,7 @@ int main()
 
             /***********************   step ******************************* */
 
-            else if (input_tokens[0] == "step" and input_tokens.size() == 1)
+            else if (input_tokens[0] == "step" && input_tokens.size() == 1)
             {
                 just_started = false;
                 // to know main:0 in satck
@@ -256,7 +349,7 @@ int main()
 
             /***********************   mem ******************************* */
 
-            else if (input_tokens[0] == "mem" and input_tokens.size() == 3)
+            else if (input_tokens[0] == "mem" && input_tokens.size() == 3)
             {
                 if (!is_loaded)
                 {
@@ -269,7 +362,7 @@ int main()
 
             /***********************  clear ******************************* */
 
-            else if (input_tokens[0] == "cls" or input_tokens[0] == "clear")
+            else if (input_tokens[0] == "cls" || input_tokens[0] == "clear")
             {
                 std::cout << "\033[2J\033[1;1H"; // makes platform independent
             }

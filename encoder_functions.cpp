@@ -7,6 +7,9 @@
 #include <variant>
 #include <cstdint>
 #include<deque>
+
+
+
 /***************************************************************************************************************************/
 void helpers::
     Encode_R(std::unordered_map<std::string, memory::Register> &regs, int &PC, std::string &binary_string, std::string &raw_string)
@@ -72,7 +75,7 @@ void helpers::
 /***************************************************************************************************************************/
 void helpers::
     Encode_I(std::unordered_map<std::string, memory::Register> &regs, int &PC, std::string &binary_string, std::string &raw_string,
-             std::vector<memory::byte> &data_stack__mem, int &data_ptr, int &stack_ptr,std::deque<std::pair<std::string,int>>&call_stack,int&e_pc,std::pair<std::string,int>&current_stack)
+             std::vector<memory::byte> &data_stack__mem, int &data_ptr, int &stack_ptr,std::deque<std::pair<std::string,int>>&call_stack,int&e_pc,std::pair<std::string,int>&current_stack,bool cache_is_on,cache::cache_table*CACHE)
 {
 
     std::string rd = binary_string.substr(20, 5);
@@ -150,7 +153,7 @@ void helpers::
         int64_t adress_index = (regs[rs1] + imm).get_value() - 0x10000; // index in memory
         int no_of_bytes = 8;
         bool is_signed = true;
-        if (f3 == s3(0x0)) // lb
+        if (f3 == s3(0x0) ) // lb
         {
 
             no_of_bytes = 1;
@@ -192,6 +195,10 @@ void helpers::
             no_of_bytes = 4;
             is_signed = false;
         }
+
+        
+        
+
 
         load_to_register(data_stack__mem, regs[rd], no_of_bytes, adress_index, is_signed, PC / 4);
         PC += 4;

@@ -13,6 +13,29 @@
 
 
 /*********************************************************************************************************************** */
+void helpers::print_cache_stats(cache::cache_table* tab,std::string reqs[5])
+{
+    std::cout<<"Cache Size: "<<reqs[0]<<std::endl;
+    std::cout<<"Block Size: "<<reqs[1]<<std::endl;
+    std::cout<<"Associativity: "<<reqs[2]<<std::endl;
+    std::cout<<"Replacement Policy: "<<reqs[3]<<std::endl;
+    std::cout<<"Write Back Policy: "<<reqs[4]<<std::endl;
+}
+
+
+
+
+
+std::string helpers::To_lower(const std::string& str)
+{
+    std::string str2=str;
+    std::transform(str2.begin(),str2.end(),str2.begin(),[](char ch) {return std::tolower(ch);} );
+    return str2;
+}
+
+
+
+
 
 void helpers::fill_default(std::vector<memory::byte> &text_section_mem, std::vector<memory::byte> data_stack__mem,
                            int &data_ptr, int &st_ptr,
@@ -436,7 +459,8 @@ helpers::
 void helpers::
     identify(std::unordered_map<std::string, memory::Register> &regs, std::vector<memory::byte> &data_stack__mem,
              int &data_ptr, int &stack_ptr, int &PC, std::vector<std::pair<std::string, int>> &Binary_Lines,
-             std::vector<std::pair<std::string, int>> &raw_lines, std::vector<int> &b_points, bool is_step, std::deque<std::pair<std::string,int>> &call_stack, std::map<std::string, int> &__lables, int &e_pc,std::pair<std::string,int>&current_stack)
+             std::vector<std::pair<std::string, int>> &raw_lines, std::vector<int> &b_points, bool is_step, std::deque<std::pair<std::string,int>> &call_stack, std::map<std::string, int> &__lables, int &e_pc,std::pair<std::string,int>&current_stack,
+             bool cache_is_on, cache::cache_table* CACHE)
 {
 
     // identify and distribute to the functions of different formats
@@ -472,7 +496,7 @@ void helpers::
 
         case assembler::I_TYPE:
             e_pc=PC;
-            Encode_I(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, call_stack, e_pc,current_stack);
+            Encode_I(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, call_stack, e_pc,current_stack,cache_is_on,CACHE);
             break;
         case assembler::S_TYPE:
             e_pc = PC;

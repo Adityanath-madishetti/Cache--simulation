@@ -7,6 +7,62 @@
 #include <bitset>
 #include "resources.hh"
 
+/*********************************************************** */
+ cache::cache_table::cache_table(int cache_size,int block_size,int associativity,std::string rep_p,std::string w_p){
+            HIT_COUNT_=0;
+            MISS_COUNT_=0;
+            NO_OF_WAYS_ = associativity;
+            CACHE_SIZE_=cache_size;
+
+            if(NO_OF_WAYS_==0)
+            {
+                is_fully_associative = true;
+                NO_OF_INDEX_BITS_=0; // only one index
+                NO_OF_WAYS_ = (cache_size)/(block_size) ;// bsically equal to no. of lines
+            }
+            else
+            {
+                // number of indices = (cache_size)/(associativity*block_size) and bits is log2(number of indices)
+                 int no_of_sets  = (cache_size)/(associativity*block_size);
+                 NO_OF_INDEX_BITS_ = log2(no_of_sets); 
+                 is_fully_associative=false;
+            }
+
+            NO_OF_OFFSET_BITS_= log2(block_size);
+            
+            NO_OF_TAG_BITS_ = 20 - NO_OF_INDEX_BITS_ - NO_OF_OFFSET_BITS_  ;
+
+            helpers::pc_value(23);
+            if(helpers::To_lower(w_p)=="wb")
+            {
+                WRITE_P_HIT_ = WRITE_POLICY_HIT::WB;
+                WRITE_P_MISS_ = WRITE_POLICY_MISS::WA;
+            }   
+            else 
+            {
+                WRITE_P_HIT_ = WRITE_POLICY_HIT::WT;
+                WRITE_P_MISS_ = WRITE_POLICY_MISS::NA;
+            }
+            
+
+            rep_p=helpers::To_lower(rep_p);
+
+            if(rep_p=="lru")
+                REP_P_ = REPLACEMENT_POLICY::LRU;
+            else if (rep_p=="fifo")
+                REP_P_=REPLACEMENT_POLICY::FIFO;
+            else
+                REP_P_ = REPLACEMENT_POLICY::RANDOM;
+            
+            for(int i=0;i<pow(2,NO_OF_INDEX_BITS_);i++)
+            {
+                // dont send associativity casue associativity might be 0 aslo
+                this->table.emplace_back(this->NO_OF_WAYS_,this->NO_OF_TAG_BITS_,block_size);
+            }
+        }
+
+/**************************************************** */
+
 void
 memory::
 byte::print()
