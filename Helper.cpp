@@ -10,7 +10,7 @@
 #include <map>
 #include <cstdlib>
 #include <ctime>
-
+#include <fstream>
 
 /*********************************************************************************************************************** */
 void helpers::print_cache_status(cache::cache_table *tab, std::string reqs[5])
@@ -30,10 +30,8 @@ void helpers::cache_stats(cache::cache_table *tab)
     }
 
     float hitrate = (float)tab->HIT_COUNT_ / ((float)tab->HIT_COUNT_ + (float)tab->MISS_COUNT_);
-    std::cout << "D-cache statistics: " << "Accesses=" << tab->HIT_COUNT_ + tab->MISS_COUNT_ << ", Hit=" << tab->HIT_COUNT_ << ", Miss=" << tab->MISS_COUNT_ << ", Hit Rate" << hitrate << std::endl;
+    std::cout << "D-cache statistics: " << "Accesses=" << tab->HIT_COUNT_ + tab->MISS_COUNT_ << ", Hit=" << tab->HIT_COUNT_ << ", Miss=" << tab->MISS_COUNT_ << ", Hit Rate=" << hitrate << std::endl;
 }
-
-
 
 void helpers::cache_to_register(const std::vector<memory::byte> &memory_line, memory::Register &REG, int no_of_bytes, int64_t data_index, bool is_signed, int line_no, cache::cache_table *CACHE)
 {
@@ -104,8 +102,8 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
     if (i < CACHE->table[cache_set_number].collection.size()) // no_of_lines_in_association
     {
         CACHE->table[cache_set_number].collection[i].tag_container = tag;
-        CACHE->table[cache_set_number].collection[i].change = cache::status::clean;
-        CACHE->table[cache_set_number].collection[i].valid = cache::validity::yes;
+        CACHE->table[cache_set_number].collection[i].change = cache::status::clean; // set clean
+        CACHE->table[cache_set_number].collection[i].valid = cache::validity::yes;  // set valid
         CACHE->table[cache_set_number].collection[i].cache_data = req_memory;
 
         if (CACHE->REP_P_ == cache::REPLACEMENT_POLICY::LRU)
@@ -121,12 +119,12 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
         {
 
             if (CACHE->table[cache_set_number].collection[0].change != cache::status::clean)
-            {   
+            {
                 uint32_t earlier_tag = CACHE->table[cache_set_number].collection[0].tag_container;
                 int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
                 for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
                 {
-                    data_stack__mem[earlier_mem_address + k-0x10000] = CACHE->table[cache_set_number].collection[0].cache_data[k]; // 0th index is being replaced
+                    data_stack__mem[earlier_mem_address + k - 0x10000] = CACHE->table[cache_set_number].collection[0].cache_data[k]; // 0th index is being replaced
                 }
             }
 
@@ -141,26 +139,27 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
 
             CACHE->table[cache_set_number].collection.emplace_back(std::pow(2, CACHE->NO_OF_OFFSET_BITS_), CACHE->NO_OF_TAG_BITS_);
             CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].tag_container = tag;
-            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].change = cache::status::clean;
-            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].valid = cache::validity::yes;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].change = cache::status::clean; // set clean
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].valid = cache::validity::yes;  // set clean
             CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].cache_data = req_memory;
         }
-        else{
+        else
+        {
             std::srand(static_cast<unsigned int>(std::time(0)));
             int randomNumber = std::rand();
             randomNumber = randomNumber % CACHE->NO_OF_WAYS_;
-            if (CACHE->table[cache_set_number].collection[randomNumber].change != cache::status::clean)
+            if (CACHE->table[cache_set_number].collection[randomNumber].change != cache::status::clean) // handling dirty block replacement
             {
                 uint32_t earlier_tag = CACHE->table[cache_set_number].collection[randomNumber].tag_container;
                 int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
 
                 for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
                 {
-                    data_stack__mem[earlier_mem_address + k-0x10000] = CACHE->table[cache_set_number].collection[randomNumber].cache_data[k]; // random index is being replaced
+                    data_stack__mem[earlier_mem_address + k - 0x10000] = CACHE->table[cache_set_number].collection[randomNumber].cache_data[k]; // random index is being replaced
                 }
             }
 
-            CACHE->table[cache_set_number].collection.erase(CACHE->table[cache_set_number].collection.begin()+randomNumber);
+            CACHE->table[cache_set_number].collection.erase(CACHE->table[cache_set_number].collection.begin() + randomNumber);
 
             // {
             //     cache_data.resize(cache_line_size);
@@ -171,8 +170,8 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
 
             CACHE->table[cache_set_number].collection.emplace_back(std::pow(2, CACHE->NO_OF_OFFSET_BITS_), CACHE->NO_OF_TAG_BITS_);
             CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].tag_container = tag;
-            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].change = cache::status::clean;
-            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].valid = cache::validity::yes;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].change = cache::status::clean; // set clean
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].valid = cache::validity::yes;  // set valid
             CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].cache_data = req_memory;
         }
         // first handle dirty block gracefully
@@ -188,6 +187,17 @@ std::string helpers::To_lower(const std::string &str)
         c = std::tolower(c);
     }
     return str2;
+}
+
+std::string Conversions::print_in_hex_for_tag(uint32_t num, int dig)
+{
+    uint32_t a = (1U << dig) - 1;
+    uint32_t tag = num & a;
+    int b = (dig + 3) / 4;
+    std::stringstream ss;
+    ss  << std::setw(b) << std::setfill('0') << std::hex << tag ;
+    std::string temp = "0x";
+    return (temp+ helpers::remove_leading_zeros( ss.str()));
 }
 
 void helpers::fill_default(std::vector<memory::byte> &text_section_mem, std::vector<memory::byte> data_stack__mem,
@@ -608,7 +618,7 @@ void helpers::
     identify(std::unordered_map<std::string, memory::Register> &regs, std::vector<memory::byte> &data_stack__mem,
              int &data_ptr, int &stack_ptr, int &PC, std::vector<std::pair<std::string, int>> &Binary_Lines,
              std::vector<std::pair<std::string, int>> &raw_lines, std::vector<int> &b_points, bool is_step, std::deque<std::pair<std::string, int>> &call_stack, std::map<std::string, int> &__lables, int &e_pc, std::pair<std::string, int> &current_stack,
-             bool& cache_is_on, cache::cache_table *CACHE,std::vector<std::string>&final_output_vector)
+             bool &cache_is_on, cache::cache_table *CACHE, std::vector<std::string> &final_output_vector, std::string op_file_name)
 {
 
     // identify and distribute to the functions of different formats
@@ -643,11 +653,11 @@ void helpers::
 
         case assembler::I_TYPE:
             e_pc = PC;
-            Encode_I(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, call_stack, e_pc, current_stack, cache_is_on, CACHE,final_output_vector);
+            Encode_I(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, call_stack, e_pc, current_stack, cache_is_on, CACHE, final_output_vector);
             break;
         case assembler::S_TYPE:
             e_pc = PC;
-            Encode_S(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr,cache_is_on, CACHE);
+            Encode_S(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, cache_is_on, CACHE,final_output_vector);
             break;
         case assembler::J_TYPE:
             e_pc = PC;
@@ -671,18 +681,45 @@ void helpers::
 
         if (is_step)
         {
-            if (cache_is_on && PC / 4 == Binary_Lines.size() )
+            if (cache_is_on && PC / 4 == Binary_Lines.size())
             {
                 helpers::cache_stats(CACHE);
+
+                std::ofstream file_name(op_file_name);
+
+                if (!file_name)
+                {
+                    throw std::runtime_error("file for output not opened");
+                }
+                for (auto &ele : final_output_vector)
+                {
+                    file_name << ele << std::endl;
+                }
+
+                if (file_name.is_open())
+                    file_name.close();
             }
             return;
         }
-    }
 
-    if (cache_is_on && PC == Binary_Lines.size() * 4)
-    {
-        // !!!!print statistics
-        helpers::cache_stats(CACHE);
+        if (cache_is_on && PC == Binary_Lines.size() * 4)
+        {
+            // !!!!print statistics
+            helpers::cache_stats(CACHE);
+            std::ofstream file_name(op_file_name);
+
+            if (!file_name)
+            {
+                throw std::runtime_error("file for output not opened");
+            }
+            for (auto &ele : final_output_vector)
+            {
+                file_name << ele << std::endl;
+            }
+
+            if (file_name.is_open())
+                file_name.close();
+        }
     }
 }
 
@@ -740,8 +777,7 @@ void helpers::store_in_mem(std::vector<memory::byte> &data__stack_mem, std::stri
     }
 }
 
-
-void helpers::store_in_cache(std::vector<memory::byte> &memory_line, std::string hex_string, int no_of_bytes, int data_index, int line_no,cache::cache_table *CACHE)
+void helpers::store_in_cache(std::vector<memory::byte> &memory_line, std::string hex_string, int no_of_bytes, int data_index, int line_no, cache::cache_table *CACHE)
 {
     int start = 14;
 
@@ -754,12 +790,10 @@ void helpers::store_in_cache(std::vector<memory::byte> &memory_line, std::string
         throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
     }
     for (int i = data_index; i < data_index + no_of_bytes; i++)
-    {   
+    {
         memory_line[i].setval_hex(hex_string.substr(start, 2));
         start -= 2;
     }
-    
-
 }
 
 /************************************************** */

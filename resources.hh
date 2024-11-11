@@ -18,8 +18,8 @@
 #include <optional>
 #include <algorithm>
 #include <cctype>
-#define and &&
-#define or ||
+// #define and &&
+// #define or ||
 /************************************************************************************************************* */
 namespace Conversions
 {
@@ -39,6 +39,9 @@ namespace Conversions
     uint8_t bin_to_unsigned_8_byte_uinteger(const std::string &binaryStr);
 
     int64_t bin_to_dec_any_bits(const std::string &binary_str);
+
+    std::string print_in_hex_for_tag(uint32_t num,int dig);
+    
 
 }
 
@@ -460,7 +463,7 @@ namespace helpers
     void identify(std::unordered_map<std::string, memory::Register> &, std::vector<memory::byte> &,
                   int &, int &, int &, std::vector<std::pair<std::string, int>> &,
                   std::vector<std::pair<std::string, int>> &, std::vector<int> &, bool is_step, std::deque<std::pair<std::string, int>> &call_stack, std::map<std::string, int> &__lable, int &e_pc,
-                  std::pair<std::string, int> &current_stack,bool& cache_is_on, cache::cache_table* CACHE,std::vector<std::string>&final_output_vector);
+                  std::pair<std::string, int> &current_stack,bool& cache_is_on, cache::cache_table* CACHE,std::vector<std::string>&final_output_vector,std::string file_name);
 
     assembler::Type format_return(const std::string &opcode);
 
@@ -479,7 +482,7 @@ namespace helpers
 
     void Encode_U(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &);
 
-    void Encode_S(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &, std::vector<memory::byte> &, int &, int &,bool,cache::cache_table*);
+    void Encode_S(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &, std::vector<memory::byte> &, int &, int &,bool,cache::cache_table*,std::vector<std::string>&final_output_vector);
 
     void store_in_mem(std::vector<memory::byte> &data__stack_mem, std::string hex_string, int no_of_bytes, int start_index, int line_no);
 

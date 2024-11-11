@@ -132,7 +132,7 @@ void helpers::
 
         PC += 4;
     }
-    else if (opcode_dec1 and f3 == s3(0x2)) // slt
+    else if ((opcode_dec1) and (f3 == s3(0x2))) // slt
     {
         regs[rd] = (regs[rs1] < imm) ? 1 : 0;
         PC += 4;
@@ -220,9 +220,20 @@ void helpers::
                     CACHE->table[cache_set_number].collection.push_back(temp);
                 }
 
+                std::stringstream ss;
+                ss<<"R: Address: 0x";
+                ss<<std::hex<< actual_address<<std::dec;
+                ss<<", Set: 0x"<<std::hex<<cache_set_number<<std::dec<<", Hit, Tag: "<< Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_)<<", ";
+                if(CACHE->table[cache_set_number].collection[line_in_ass].is_clean())
+                    ss<<"Clean";
+                else
+                    ss<<"Dirty";
+
+                final_output_vector.push_back(ss.str());
                 
+
             }
-            // else go to memory (here comes replacement policy)
+            // else go to memory (here comes replacement policy (one of case))
             else
             {
 
@@ -230,6 +241,25 @@ void helpers::
                 int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
                 load_to_register(data_stack__mem, regs[rd], no_of_bytes, adress_index, is_signed, PC / 4);
                 helpers::mem_to_cache(data_stack__mem, CACHE, PC / 4, data_index, no_of_bytes, tag, cache_set_number);
+
+                std::stringstream ss;
+                ss<<"R: Address: 0x";
+                ss<<std::hex<< actual_address<<std::dec;
+                ss<<", Set: 0x"<<std::hex<<cache_set_number<<std::dec<<", Miss, Tag: "<<Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_) <<", ";
+
+                                line_in_ass = CACHE->table[cache_set_number].find_line(tag);
+
+                if(CACHE->table[cache_set_number].collection[line_in_ass].is_clean()) //ofc it will be clean beacuse read miss has nothing to do with any policy cause it always brings to cache the new and freash memory  
+                {
+                    ss<<"Clean";
+                    
+                }
+                else
+                {
+                    ss<<"Dirty"; // never entwers this case (so if u want u can remove it, its put to check any error)
+                   
+                }
+                    final_output_vector.push_back(ss.str());
             }
         }
         else
@@ -303,7 +333,8 @@ void helpers::
 
 /***************************************************************************************************************************/
 
-void helpers::Encode_S(std::unordered_map<std::string, memory::Register> &regs, int &PC, std::string &binary_string, std::string &raw_string, std::vector<memory::byte> &data__stack_mem, int &data_ptr, int &stack_ptr, bool cache_is_on, cache::cache_table *CACHE)
+void helpers::Encode_S(std::unordered_map<std::string, memory::Register> &regs, int &PC, std::string &binary_string, std::string &raw_string, std::vector<memory::byte> &data__stack_mem, int &data_ptr, int &stack_ptr, bool cache_is_on, cache::cache_table *CACHE,
+std::vector<std::string>&final_output_vector)
 {
     auto s3 = [](int i) -> std::string
     {
@@ -354,7 +385,7 @@ void helpers::Encode_S(std::unordered_map<std::string, memory::Register> &regs, 
         int line_in_ass = CACHE->table[cache_set_number].find_line(tag);
         CACHE[cache_set_number];
 
-        if (line_in_ass != -1)
+        if (line_in_ass != -1) //hit
         {
             CACHE->HIT_COUNT_++;
             std::vector<memory::byte> &memory_line = CACHE->table[cache_set_number].collection[line_in_ass].cache_data;
@@ -368,28 +399,79 @@ void helpers::Encode_S(std::unordered_map<std::string, memory::Register> &regs, 
             {
                 CACHE->table[cache_set_number].collection[line_in_ass].change = cache::status::dirty;
             }
+
+            /**** writing into vector */
+
+            std::stringstream ss;
+            ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: "<<std::hex<<cache_set_number<<std::dec<<", Hit, Tag: "
+            << Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_)<<", ";
+
+            if(CACHE->table[cache_set_number].collection[line_in_ass].is_clean())
+                    ss<<"Clean";
+                else
+                    ss<<"Dirty";
+
+                final_output_vector.push_back(ss.str());
+                /************************ */
+
         }
-        else
+        else //miss
         {
             CACHE->MISS_COUNT_++;
             int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
-            if(CACHE->WRITE_P_MISS_ == cache::WRITE_POLICY_MISS::NA){
+            if(CACHE->WRITE_P_MISS_ == cache::WRITE_POLICY_MISS::NA)
+            {
+                // std::cout<<"entered in NA"<<std::endl;
                 store_in_mem(data__stack_mem, hex_string, no_of_bytes, address_index, PC / 4);
             }
-            else{
+            else // allocate  (WA)
+            {
                 helpers::mem_to_cache(data__stack_mem, CACHE, PC / 4, data_index, no_of_bytes, tag, cache_set_number);
-                line_in_ass = CACHE->table[cache_set_number].find_line(tag);
+
+                line_in_ass = CACHE->table[cache_set_number].find_line(tag);// you brought that to cache in above line of code so you will get it in cache for sure
+
+                if(line_in_ass==-1)
+                {
+                    throw std::runtime_error("unwanted brach entry in encodes function 's cache_miss case");
+                }
+
                 std::vector<memory::byte> &memory_line = CACHE->table[cache_set_number].collection[line_in_ass].cache_data;
                 helpers::store_in_cache(memory_line, hex_string, no_of_bytes, data_index, PC / 4, CACHE);
-                if (CACHE->WRITE_P_HIT_ == cache::WRITE_POLICY_HIT::WT)
+
+                if (CACHE->WRITE_P_HIT_ == cache::WRITE_POLICY_HIT::WT) // acc to lab7 rules it will not go into it; because wt is only with na
                 {
                     store_in_mem(data__stack_mem, hex_string, no_of_bytes, address_index, PC / 4);
                 }
-                else
+                else // goes into this only acc to lab7 rules
                 {
                     CACHE->table[cache_set_number].collection[line_in_ass].change = cache::status::dirty;
                 }
+
+                std::stringstream ss;
+                ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: "<<std::hex<<cache_set_number<<std::dec<<", Miss, Tag: "
+                <<Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_)<<", ";
+                ss<<"Dirty";
+
+                final_output_vector.push_back(ss.str());
+
             }
+            
+             
+            
+            if(CACHE->WRITE_P_MISS_ == cache::WRITE_POLICY_MISS::NA)
+            {
+                
+                std::stringstream ss;
+                ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: 0x"<<std::hex<<cache_set_number<<std::dec<<", Miss, Tag: "
+                <<Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_)<<", ";
+                ss<<"Clean";
+                final_output_vector.push_back(ss.str());
+            }
+            
+
+            
+            
+
         }
     }
     else

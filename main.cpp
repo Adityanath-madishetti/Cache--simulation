@@ -14,8 +14,8 @@ std::vector<std::string> input_collector()
     std::string input;
     std::getline(std::cin, input);
 
-    if(input.size()==0 || std::isspace(input[0]))
-    {   
+    if (input.size() == 0 || std::isspace(input[0]))
+    {
         return input_collector();
     }
     std::stringstream ss(input);
@@ -36,12 +36,14 @@ std::vector<std::string> input_collector()
     return input_tokens;
 }
 
-bool is_whitespace(char c) {
+bool is_whitespace(char c)
+{
     return std::isspace(static_cast<unsigned char>(c));
 }
 
-void trim(std::string& s) {
-    s.erase(s.find_last_not_of(" \n\r\t")+1);
+void trim(std::string &s)
+{
+    s.erase(s.find_last_not_of(" \n\r\t") + 1);
 }
 
 int main()
@@ -80,6 +82,7 @@ int main()
         std::string reqs[5];
         cache::cache_table *CACHE = nullptr;
         std::vector<std::string> final_output_vector;
+        std::string op_file_name;
         /******************************************************************* */
 
         std::vector<std::string> available_cmds = {"print text", "show-stack", "run", "step", "break", "del break", "load", "exit", "regs", "mem count", "clear", "cls"};
@@ -90,12 +93,11 @@ int main()
 
             std::vector<std::string> input_tokens = input_collector();
 
-           
             /************************************************** */
             if ((input_tokens[0] == "cache_sim") && (input_tokens[1] == "dump"))
             {
                 if (cache_is_on)
-                {   
+                {
                     std::fstream file_obj;
                     std::ofstream MyFile(input_tokens[2]);
                     // file_obj.open(input_tokens[2]);
@@ -105,30 +107,30 @@ int main()
                     // Set: 0x01, Tag: 0x736, Dirty
                     // Set:0x02, Tag: 0x145, Dirty
                     // Set:0x10, Tag: 0x321, Clean
-                    
-                    int set=0;
 
-                   auto func =  [](cache::cache_line line)->std::string
+                    int set = 0;
+
+                    auto func = [](cache::cache_line line) -> std::string
                     {
-                        if(line.is_clean())
+                        if (line.is_clean())
                             return "Clean";
                         else
                             return "Dirty";
                     };
 
-                    for(auto& ass : CACHE->table)
+                    for (auto &ass : CACHE->table)
                     {
-                        for(auto& line : ass.collection)
+                        for (auto &line : ass.collection)
                         {
-                            if(line.is_valid())
-                                MyFile<<"set: 0x"<<std::hex<<set<<", Tag: 0x"<<line.get_tag()<<", "<<func(line)<<std::dec<<std::endl;
+                            if (line.is_valid())
+                                MyFile << "set: 0x" << std::hex << set << ", Tag: 0x" << line.get_tag() << ", " << func(line) << std::dec << std::endl;
                         }
                         set++;
                     }
                 }
             }
 
-           else if (input_tokens[0] == "cache_sim" && input_tokens[1] == "enable")
+            else if (input_tokens[0] == "cache_sim" && input_tokens[1] == "enable")
             {
                 cache_is_on = true;
 
@@ -145,11 +147,11 @@ int main()
                     {
                         throw std::runtime_error("config_file problem");
                     }
-                     trim(temps);
+                    trim(temps);
                     reqs[i] = temps;
                     i++;
                 }
-            
+
                 CACHE = new cache::cache_table(std::stoi(reqs[0]), std::stoi(reqs[1]), std::stoi(reqs[2]), reqs[3], reqs[4]);
             }
 
@@ -180,18 +182,18 @@ int main()
                 if (cache_is_on)
                 {
                     //  !!!!!!!!  its not enough ( in wb policy first handel dirty bits and then write back them)
-                    int cache_set_number=0;
-                    for(auto& c :CACHE->table)
+                    int cache_set_number = 0;
+                    for (auto &c : CACHE->table)
                     {
-                        for(auto& line : c.collection)
+                        for (auto &line : c.collection)
                         {
-                            if(line.is_valid()&&(!(line.is_clean())))
-                            {   
+                            if (line.is_valid() && (!(line.is_clean())))
+                            {
                                 uint32_t earlier_tag = line.tag_container;
-                                int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number ) << CACHE->NO_OF_OFFSET_BITS_; // !!think
+                                int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
                                 for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
                                 {
-                                    data_stack__mem[earlier_mem_address + k-0x10000] = CACHE->table[cache_set_number].collection[0].cache_data[k]; // 0th index is being replaced
+                                    data_stack__mem[earlier_mem_address + k - 0x10000] = CACHE->table[cache_set_number].collection[0].cache_data[k]; // 0th index is being replaced
                                 }
                                 line.valid = cache::validity::no;
                                 line.change = cache::status::clean;
@@ -225,15 +227,31 @@ int main()
             {
                 is_loaded = true;
 
-                if(cache_is_on)
+                if (cache_is_on)
                 {
                     CACHE->invalidate();
+                }
+
+                if (!final_output_vector.empty())
+                {
+                    final_output_vector.clear();
                 }
 
                 if (input_fileStream.is_open())
                     input_fileStream.close(); // to close the previous file
 
+                auto remove_extension = [](const std::string &filename) -> std::string
+                {
+                    size_t pos = filename.find_last_of('.');
+
+                    if (pos == std::string::npos || pos == 0)
+                        return filename; 
+                  
+                    return filename.substr(0, pos);
+                };
+
                 std::string filename = input_tokens[1];
+                op_file_name = remove_extension(input_tokens[1]) + ".output";
 
                 parser P_object(filename, "output.hex");
 
@@ -333,7 +351,7 @@ int main()
                     continue;
                 }
 
-                helpers::identify(regs, data_stack__mem, data_ptr, stack_ptr, PC, Binary_Lines, raw_lines, b_points, false, call_stack, __lables, e_pc, current_stack, cache_is_on, CACHE,final_output_vector);
+                helpers::identify(regs, data_stack__mem, data_ptr, stack_ptr, PC, Binary_Lines, raw_lines, b_points, false, call_stack, __lables, e_pc, current_stack, cache_is_on, CACHE, final_output_vector, op_file_name);
             }
 
             /***********************   break  ******************************* */
@@ -400,8 +418,7 @@ int main()
                     std::cout << "Nothing to step " << std::endl;
 
                 else
-                    helpers::identify(regs, data_stack__mem, data_ptr, stack_ptr, PC, Binary_Lines, raw_lines, b_points, true, call_stack, __lables, e_pc, current_stack, cache_is_on, CACHE,final_output_vector);
-                    
+                    helpers::identify(regs, data_stack__mem, data_ptr, stack_ptr, PC, Binary_Lines, raw_lines, b_points, true, call_stack, __lables, e_pc, current_stack, cache_is_on, CACHE, final_output_vector, op_file_name);
             }
 
             /***********************   mem ******************************* */
