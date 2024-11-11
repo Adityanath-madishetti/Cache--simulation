@@ -12,6 +12,7 @@
 #include <istream>
 #include <unordered_map>
 #include "./project_RISC_V/resources.hh"
+#include<stack>
 #include <deque>
 #include <map>
 #include <optional>
@@ -116,7 +117,7 @@ namespace memory
 
         Register(std::string hex_string)
         {
-            value = Conversions::hex_to_decimal_64_bit(hex_string); // send 16hexbits always
+            value = Conversions::hex_to_decimal_64_bit(hex_string); //!!! send 16hexbits always
         }
 
         // overload + , - , =
@@ -203,24 +204,27 @@ namespace cache
 
     public:
         uint32_t tag_container; // lower bits are ur tag
+
         std::vector<memory::byte> cache_data;
+
         validity valid;
+
         status change;
+
         int no_of_tag_bits;
 
         // functions
         // 1 constructor
 
-        cache_line(int cache_line_size, int no_of_tag_bits) // bytes
+        cache_line(int cache_line_size, int no_of_tag_bits) // in bytes
         {
-            cache_data.resize(cache_line_size);
+            cache_data.resize(cache_line_size,0);
             valid = validity::no;
             change = status::clean;
             this->no_of_tag_bits = no_of_tag_bits;
         }
 
-    
-
+/************************** */
         void set_block_size(int num_of_bytes, int num_of_tag_bits)
         {
             cache_data.resize(num_of_bytes);
@@ -231,12 +235,10 @@ namespace cache
             tag_container = tag_val;
         }
 
-        // void set_tag(int tag_val)   // uncoment
-        // {
-
-        //     tag_container=static_cast<uint32_t>( tag_val);
-
-        // }
+        bool match_line(uint32_t tag_value_to_be_checked)
+        {
+            return (this->is_valid())&&(tag_value_to_be_checked==this->tag_container);
+        }
 
         cache_line &operator=(const cache_line &other)
         {
@@ -284,7 +286,8 @@ namespace cache
         }
 
         void clear_line()
-        {
+        {   
+            
             this->valid=validity::no;
         }
     };
@@ -324,12 +327,31 @@ namespace cache
             return *this;
         }
 
+        cache_line& operator[](const  int& index)
+        {
+            return this->collection[index];
+        }
+
         void clear_association()
         {
             for(int i=0 ; i<this->no_of_ways;i++)
             {
                 collection[i].clear_line();
             }
+        }
+
+        int find_line(uint32_t tag)
+        {
+            int line_in_ass=0;
+            for(auto& line : this->collection)
+            {  
+                if(line.match_line(tag))
+                    return line_in_ass;
+
+                        line_in_ass++;
+            }
+            return -1;
+            
         }
 
     };
@@ -340,17 +362,18 @@ namespace cache
 
 
     class cache_table
-    {
+{
     public:
         std::vector<cache::cache_association> table; // its .size() gives no. of sets/indices so noneed of another variable
         int HIT_COUNT_;
         int MISS_COUNT_;
 
         int NO_OF_WAYS_; // associativity
-        int CACHE_SIZE_;
-        int NO_OF_TAG_BITS_;
-        int NO_OF_OFFSET_BITS_;
-        int NO_OF_INDEX_BITS_;
+        int CACHE_SIZE_; // BYTES
+        int NO_OF_TAG_BITS_; 
+        int NO_OF_OFFSET_BITS_;  
+        int NO_OF_INDEX_BITS_; 
+
 
         WRITE_POLICY_HIT    WRITE_P_HIT_;
         WRITE_POLICY_MISS  WRITE_P_MISS_;
@@ -358,12 +381,36 @@ namespace cache
 
         bool is_fully_associative ;
         
+
+        
         /** some more regarding policies */
 
         // constructor 
                                     // line size
         cache_table(int cache_size,int block_size,int associativity,std::string rep_p,std::string w_p);
         
+
+        void print_policy(){
+            std::cout<<"Write Policy on Hit : ";
+            if(WRITE_P_HIT_==WRITE_POLICY_HIT::WB)
+                std::cout<<"Write Back"<<std::endl;
+            else
+                std::cout<<"Write Through"<<std::endl;
+
+            std::cout<<"Write Policy on Miss : ";
+            if(WRITE_P_MISS_==WRITE_POLICY_MISS::WA)
+                std::cout<<"Write Allocate"<<std::endl;
+            else
+                std::cout<<"No Write Allocate"<<std::endl;
+
+            std::cout<<"Replacement Policy : ";
+            if(REP_P_==REPLACEMENT_POLICY::LRU)
+                std::cout<<"LRU"<<std::endl;
+            else if(REP_P_==REPLACEMENT_POLICY::FIFO)
+                std::cout<<"FIFO"<<std::endl;
+            else
+                std::cout<<"RANDOM"<<std::endl;
+        }
 
         void invalidate()
         {
@@ -373,6 +420,16 @@ namespace cache
             }
 
         }
+
+        uint32_t index_find(uint32_t address); // gives set number
+       
+
+        cache_association& operator[](const int& index)
+        {
+            return table[index];
+        }
+
+
     };  
 
 }
@@ -403,20 +460,26 @@ namespace helpers
     void identify(std::unordered_map<std::string, memory::Register> &, std::vector<memory::byte> &,
                   int &, int &, int &, std::vector<std::pair<std::string, int>> &,
                   std::vector<std::pair<std::string, int>> &, std::vector<int> &, bool is_step, std::deque<std::pair<std::string, int>> &call_stack, std::map<std::string, int> &__lable, int &e_pc,
-                  std::pair<std::string, int> &current_stack,bool cache_is_on, cache::cache_table* CACHE);
+                  std::pair<std::string, int> &current_stack,bool& cache_is_on, cache::cache_table* CACHE,std::vector<std::string>&final_output_vector);
 
     assembler::Type format_return(const std::string &opcode);
 
     // requirments : Binary_Line(only one is enough), raw lines(only one is enough)  , PC, regs ,
     void Encode_R(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &);
     void Encode_I(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &, std::vector<memory::byte> &, int &, int &, std::deque<std::pair<std::string, int>> &, int &e_pc, std::pair<std::string, int> &current_stack,
-    bool cache_is_on , cache::cache_table*CACHE);
+    bool chehe_is_on , cache::cache_table*CACHE,std::vector<std::string>&final_output_vector);
 
     void load_to_register(std::vector<memory::byte> &, memory::Register &, int, int64_t, bool, int line_no); // memory_section , register , no_of_bytes , index in data_section
 
+    void cache_to_register(const std::vector<memory::byte> &, memory::Register &, int, int64_t, bool, int line_no,cache::cache_table*); // memory_section , register , no_of_bytes , index in data_section
+
+    void mem_to_cache(std::vector<memory::byte> & , cache::cache_table* ,int, int,int,uint32_t,int); //data_index,no_of_bytes
+    
+    void store_in_cache(std::vector<memory::byte> &, std::string ,int,int,int,cache::cache_table*);
+
     void Encode_U(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &);
 
-    void Encode_S(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &, std::vector<memory::byte> &, int &, int &);
+    void Encode_S(std::unordered_map<std::string, memory::Register> &, int &, std::string &, std::string &, std::vector<memory::byte> &, int &, int &,bool,cache::cache_table*);
 
     void store_in_mem(std::vector<memory::byte> &data__stack_mem, std::string hex_string, int no_of_bytes, int start_index, int line_no);
 
@@ -433,7 +496,9 @@ namespace helpers
     std::string removeLeadingSpaces(const std::string &str);
 
     std::string To_lower(const std::string& str);
-    void print_cache_stats(cache::cache_table* tab,std::string reqs[5]);
+    void print_cache_status(cache::cache_table* tab,std::string reqs[5]);
+    void cache_stats(cache::cache_table*tab);
+    
 
 }
 /******************************************************************************************** */

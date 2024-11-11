@@ -45,7 +45,6 @@ std::string Conversions::binary_to_Hex(const std::string &binary_str, int num_bi
 
 uint8_t Conversions::hex_to_decimal_8(const std::string &hex_string)
 {
-
     uint8_t decimalValue = static_cast<uint8_t>(stoi(hex_string, nullptr, 16));
     return decimalValue;
 }

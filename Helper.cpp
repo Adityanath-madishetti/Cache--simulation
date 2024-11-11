@@ -1,4 +1,3 @@
-
 #include "resources.hh"
 #include <bitset>
 #include <iomanip>
@@ -9,37 +8,191 @@
 #include <cassert>
 #include <deque>
 #include <map>
-
+#include <cstdlib>
+#include <ctime>
 
 
 /*********************************************************************************************************************** */
-void helpers::print_cache_stats(cache::cache_table* tab,std::string reqs[5])
+void helpers::print_cache_status(cache::cache_table *tab, std::string reqs[5])
 {
-    std::cout<<"Cache Size: "<<reqs[0]<<std::endl;
-    std::cout<<"Block Size: "<<reqs[1]<<std::endl;
-    std::cout<<"Associativity: "<<reqs[2]<<std::endl;
-    std::cout<<"Replacement Policy: "<<reqs[3]<<std::endl;
-    std::cout<<"Write Back Policy: "<<reqs[4]<<std::endl;
+    std::cout << "Cache Size: " << reqs[0] << std::endl;
+    std::cout << "Block Size: " << reqs[1] << std::endl;
+    std::cout << "Associativity: " << reqs[2] << std::endl;
+    std::cout << "Replacement Policy: " << reqs[3] << std::endl;
+    std::cout << "Write Back Policy: " << reqs[4] << std::endl;
+}
+
+void helpers::cache_stats(cache::cache_table *tab)
+{
+    if (tab->HIT_COUNT_ + tab->MISS_COUNT_ == 0)
+    {
+        std::cout << "no accesses yet!! " << std::endl;
+    }
+
+    float hitrate = (float)tab->HIT_COUNT_ / ((float)tab->HIT_COUNT_ + (float)tab->MISS_COUNT_);
+    std::cout << "D-cache statistics: " << "Accesses=" << tab->HIT_COUNT_ + tab->MISS_COUNT_ << ", Hit=" << tab->HIT_COUNT_ << ", Miss=" << tab->MISS_COUNT_ << ", Hit Rate" << hitrate << std::endl;
 }
 
 
 
-
-
-std::string helpers::To_lower(const std::string& str)
+void helpers::cache_to_register(const std::vector<memory::byte> &memory_line, memory::Register &REG, int no_of_bytes, int64_t data_index, bool is_signed, int line_no, cache::cache_table *CACHE)
 {
-    std::string str2=str;
-    std::transform(str2.begin(),str2.end(),str2.begin(),[](char ch) {return std::tolower(ch);} );
+
+    // our data_index is starting byte off set
+    int max = std::pow(2, CACHE->NO_OF_OFFSET_BITS_);
+
+    if (data_index < 0x0 or data_index + no_of_bytes - 1 >= max)
+    {
+        throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
+    }
+
+    std::string hex_string_to_be_loaded = "";
+
+    for (int i = 0; i < no_of_bytes; i++)
+    {
+        hex_string_to_be_loaded = memory_line[i + data_index].string_rep() + hex_string_to_be_loaded;
+    }
+
+    // make it to 16hexbits based on signed a=or unsigned
+
+    while (hex_string_to_be_loaded.size() != 16)
+    {
+        // assert(hex_string_to_be_loaded.size() % 2 == 0);
+
+        if (hex_string_to_be_loaded[0] >= '8' and is_signed)
+        {
+            hex_string_to_be_loaded = "ff" + hex_string_to_be_loaded;
+        }
+        else if (hex_string_to_be_loaded[0] < '8' or !is_signed)
+        {
+            hex_string_to_be_loaded = "00" + hex_string_to_be_loaded;
+        }
+    }
+    hex_string_to_be_loaded = "0x" + hex_string_to_be_loaded;
+
+    REG = memory::Register(hex_string_to_be_loaded);
+}
+
+void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::cache_table *CACHE, int line_no, int data_index, int no_of_bytes, uint32_t tag, int cache_set_number) // data_index,no_of_bytes
+{
+
+    int max = std::pow(2, CACHE->NO_OF_OFFSET_BITS_);
+
+    if (data_index < 0x0 or data_index + no_of_bytes - 1 >= max)
+    {
+        throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
+    }
+
+    int i = 0;
+    for (auto &line : CACHE->table[cache_set_number].collection)
+    {
+        if (!line.is_valid())
+            break;
+        i++;
+    }
+
+    std::vector<memory::byte> req_memory;
+
+    int start_mem_address = ((tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
+
+    start_mem_address -= 0x10000;
+
+    for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
+    {
+        req_memory.push_back(data_stack__mem[start_mem_address + k]);
+    }
+    if (i < CACHE->table[cache_set_number].collection.size()) // no_of_lines_in_association
+    {
+        CACHE->table[cache_set_number].collection[i].tag_container = tag;
+        CACHE->table[cache_set_number].collection[i].change = cache::status::clean;
+        CACHE->table[cache_set_number].collection[i].valid = cache::validity::yes;
+        CACHE->table[cache_set_number].collection[i].cache_data = req_memory;
+
+        if (CACHE->REP_P_ == cache::REPLACEMENT_POLICY::LRU)
+        {
+            cache::cache_line temp = CACHE->table[cache_set_number].collection[i];
+            CACHE->table[cache_set_number].collection.erase(CACHE->table[cache_set_number].collection.begin() + i);
+            CACHE->table[cache_set_number].collection.push_back(temp);
+        }
+    }
+    else // replacement_policy
+    {
+        if (CACHE->REP_P_ != cache::REPLACEMENT_POLICY::RANDOM) // FIFO // LRU
+        {
+
+            if (CACHE->table[cache_set_number].collection[0].change != cache::status::clean)
+            {   
+                uint32_t earlier_tag = CACHE->table[cache_set_number].collection[0].tag_container;
+                int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
+                for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
+                {
+                    data_stack__mem[earlier_mem_address + k-0x10000] = CACHE->table[cache_set_number].collection[0].cache_data[k]; // 0th index is being replaced
+                }
+            }
+
+            CACHE->table[cache_set_number].collection.erase(CACHE->table[cache_set_number].collection.begin());
+
+            // {
+            //     cache_data.resize(cache_line_size);
+            //     valid = validity::no;
+            //     change = status::clean;
+            //     this->no_of_tag_bits = no_of_tag_bits;
+            // }
+
+            CACHE->table[cache_set_number].collection.emplace_back(std::pow(2, CACHE->NO_OF_OFFSET_BITS_), CACHE->NO_OF_TAG_BITS_);
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].tag_container = tag;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].change = cache::status::clean;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].valid = cache::validity::yes;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].cache_data = req_memory;
+        }
+        else{
+            std::srand(static_cast<unsigned int>(std::time(0)));
+            int randomNumber = std::rand();
+            randomNumber = randomNumber % CACHE->NO_OF_WAYS_;
+            if (CACHE->table[cache_set_number].collection[randomNumber].change != cache::status::clean)
+            {
+                uint32_t earlier_tag = CACHE->table[cache_set_number].collection[randomNumber].tag_container;
+                int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
+
+                for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
+                {
+                    data_stack__mem[earlier_mem_address + k-0x10000] = CACHE->table[cache_set_number].collection[randomNumber].cache_data[k]; // random index is being replaced
+                }
+            }
+
+            CACHE->table[cache_set_number].collection.erase(CACHE->table[cache_set_number].collection.begin()+randomNumber);
+
+            // {
+            //     cache_data.resize(cache_line_size);
+            //     valid = validity::no;
+            //     change = status::clean;
+            //     this->no_of_tag_bits = no_of_tag_bits;
+            // }
+
+            CACHE->table[cache_set_number].collection.emplace_back(std::pow(2, CACHE->NO_OF_OFFSET_BITS_), CACHE->NO_OF_TAG_BITS_);
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].tag_container = tag;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].change = cache::status::clean;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].valid = cache::validity::yes;
+            CACHE->table[cache_set_number].collection[CACHE->NO_OF_WAYS_ - 1].cache_data = req_memory;
+        }
+        // first handle dirty block gracefully
+    }
+}
+
+std::string helpers::To_lower(const std::string &str)
+{
+    std::string str2 = str;
+
+    for (auto &c : str2)
+    {
+        c = std::tolower(c);
+    }
     return str2;
 }
 
-
-
-
-
 void helpers::fill_default(std::vector<memory::byte> &text_section_mem, std::vector<memory::byte> data_stack__mem,
                            int &data_ptr, int &st_ptr,
-                           std::unordered_map<std::string, memory::Register> &regs, int &pc, std::vector<int> &b_points,std::deque<std::pair<std::string,int>>&call_stack)
+                           std::unordered_map<std::string, memory::Register> &regs, int &pc, std::vector<int> &b_points, std::deque<std::pair<std::string, int>> &call_stack)
 {
 
     if (text_section_mem.size() != 0)
@@ -61,8 +214,8 @@ void helpers::fill_default(std::vector<memory::byte> &text_section_mem, std::vec
 
     pc = 0x0;
     b_points.clear();
-   if(!call_stack.empty()) call_stack.clear();
-    
+    if (!call_stack.empty())
+        call_stack.clear();
 }
 
 /*********************************************************************************************************************** */
@@ -82,7 +235,7 @@ void helpers::
 {
     // std::cout << std::setw(24) << "" << "-------------- " << color::red << " THE REGISTERS " << color::reset << " --------------" << std::endl;
     int i = 0;
-    std::cout<<"Registers"<<std::endl;
+    std::cout << "Registers" << std::endl;
     for (; i < 32; i++)
     {
 
@@ -355,13 +508,11 @@ void helpers::init_data_section(std::vector<memory::byte> &data_sectio__mem, std
                     }
                     token = token.substr(14);
 
-                      for (int i = 0; i >= 0; i -= 2)
-                {
-                    ptr++;
-                    data_sectio__mem[ptr] = memory::byte(token.substr(i, 2));
-                }
-
-
+                    for (int i = 0; i >= 0; i -= 2)
+                    {
+                        ptr++;
+                        data_sectio__mem[ptr] = memory::byte(token.substr(i, 2));
+                    }
                 }
                 else
                 {
@@ -380,17 +531,14 @@ void helpers::init_data_section(std::vector<memory::byte> &data_sectio__mem, std
                     hex_stream << std::setfill('0') << std::setw(2) << std::hex << static_cast<int>(val);
                     // casue printing int8_t causes problem
                     token = hex_stream.str();
-                    int size= token.size();
-                for (int i = size-2; i >=size-2; i -= 2)
-                {
-                    ptr++;
-                    data_sectio__mem[ptr] = memory::byte(token.substr(i, 2));
-                }
-
+                    int size = token.size();
+                    for (int i = size - 2; i >= size - 2; i -= 2)
+                    {
+                        ptr++;
+                        data_sectio__mem[ptr] = memory::byte(token.substr(i, 2));
+                    }
                 }
                 // 0 1 2 3
-
-                
             }
             else
             {
@@ -408,7 +556,7 @@ void helpers::init_data_section(std::vector<memory::byte> &data_sectio__mem, std
 void helpers::request_data(std::vector<memory::byte> &data_section__mem, std::string address, int count)
 {
     int number = std::stoi(address, nullptr, 16);
-    
+
     int index = number - 0x10000;
     // if u wanna include text section also then  make 2 if conditions based on value
 
@@ -426,7 +574,7 @@ void helpers::request_data(std::vector<memory::byte> &data_section__mem, std::st
         ss << std::hex << std::setw(5) << std::setfill('0') << i + 0x10000;
         // std::cout << std::setw(25) << "|";
         // std::cout << std::setw(18) << "" << "mem[ 0x" << ss.str() << " ] = 0x" << data_section__mem[i] << std::setw(19) << "" << "|" << std::endl;
-        std::cout << "memory[ 0x" << ss.str() << " ] = 0x" << data_section__mem[i] <<  std::endl;
+        std::cout << "memory[ 0x" << ss.str() << " ] = 0x" << data_section__mem[i] << std::endl;
         ss.str("");
     }
     // std::cout << std::setw(25) << "" << "********************" << color::green << "  THE END " << color::reset << "*****************************" << std::endl;
@@ -459,8 +607,8 @@ helpers::
 void helpers::
     identify(std::unordered_map<std::string, memory::Register> &regs, std::vector<memory::byte> &data_stack__mem,
              int &data_ptr, int &stack_ptr, int &PC, std::vector<std::pair<std::string, int>> &Binary_Lines,
-             std::vector<std::pair<std::string, int>> &raw_lines, std::vector<int> &b_points, bool is_step, std::deque<std::pair<std::string,int>> &call_stack, std::map<std::string, int> &__lables, int &e_pc,std::pair<std::string,int>&current_stack,
-             bool cache_is_on, cache::cache_table* CACHE)
+             std::vector<std::pair<std::string, int>> &raw_lines, std::vector<int> &b_points, bool is_step, std::deque<std::pair<std::string, int>> &call_stack, std::map<std::string, int> &__lables, int &e_pc, std::pair<std::string, int> &current_stack,
+             bool& cache_is_on, cache::cache_table *CACHE,std::vector<std::string>&final_output_vector)
 {
 
     // identify and distribute to the functions of different formats
@@ -484,7 +632,6 @@ void helpers::
 
         const assembler::Type format = format_return(opcode);
 
-        
         int earlier_pc = PC;
 
         switch (format)
@@ -495,19 +642,19 @@ void helpers::
             break;
 
         case assembler::I_TYPE:
-            e_pc=PC;
-            Encode_I(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, call_stack, e_pc,current_stack,cache_is_on,CACHE);
+            e_pc = PC;
+            Encode_I(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr, call_stack, e_pc, current_stack, cache_is_on, CACHE,final_output_vector);
             break;
         case assembler::S_TYPE:
             e_pc = PC;
-            Encode_S(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr);
+            Encode_S(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, data_stack__mem, data_ptr, stack_ptr,cache_is_on, CACHE);
             break;
         case assembler::J_TYPE:
-            e_pc=PC;
-            Encode_J(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, call_stack,Binary_Lines[PC/4].second,current_stack);
+            e_pc = PC;
+            Encode_J(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first, call_stack, Binary_Lines[PC / 4].second, current_stack);
             break;
         case assembler::B_TYPE:
-            e_pc=PC;
+            e_pc = PC;
             Encode_B(regs, PC, Binary_Lines[PC / 4].first, raw_lines[PC / 4].first);
             break;
         case assembler::U_TYPE:
@@ -517,12 +664,25 @@ void helpers::
         case assembler::NONE:
             throw std::runtime_error("unknow opcode at line no " + std::to_string(sentence.second));
         }
-         
-        std::cout << "Executed " << helpers::removeLeadingSpaces( raw_lines[earlier_pc / 4.].first) << "; PC = " << helpers::pc_value(earlier_pc) << std::endl;
+
+        std::cout << "Executed " << helpers::removeLeadingSpaces(raw_lines[earlier_pc / 4.].first) << "; PC = " << helpers::pc_value(earlier_pc) << std::endl;
 
         // PC updated in respective format_functions because jumps change abruptly
+
         if (is_step)
+        {
+            if (cache_is_on && PC / 4 == Binary_Lines.size() )
+            {
+                helpers::cache_stats(CACHE);
+            }
             return;
+        }
+    }
+
+    if (cache_is_on && PC == Binary_Lines.size() * 4)
+    {
+        // !!!!print statistics
+        helpers::cache_stats(CACHE);
     }
 }
 
@@ -548,7 +708,7 @@ void helpers::
 
     while (hex_string_to_be_loaded.size() != 16)
     {
-        assert(hex_string_to_be_loaded.size() % 2 == 0);
+        // assert(hex_string_to_be_loaded.size() % 2 == 0);
 
         if (hex_string_to_be_loaded[0] >= '8' and is_signed)
         {
@@ -580,6 +740,28 @@ void helpers::store_in_mem(std::vector<memory::byte> &data__stack_mem, std::stri
     }
 }
 
+
+void helpers::store_in_cache(std::vector<memory::byte> &memory_line, std::string hex_string, int no_of_bytes, int data_index, int line_no,cache::cache_table *CACHE)
+{
+    int start = 14;
+
+    if ((no_of_bytes != 1 and no_of_bytes % 2 == 1) or no_of_bytes > 8 or no_of_bytes <= 0)
+        throw std::runtime_error("allocation gone wrong at " + std::to_string(line_no));
+
+    int max = std::pow(2, CACHE->NO_OF_OFFSET_BITS_);
+    if (data_index < 0x0 or data_index + no_of_bytes - 1 >= max)
+    {
+        throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
+    }
+    for (int i = data_index; i < data_index + no_of_bytes; i++)
+    {   
+        memory_line[i].setval_hex(hex_string.substr(start, 2));
+        start -= 2;
+    }
+    
+
+}
+
 /************************************************** */
 
 std::string helpers::remove_leading_zeros(const std::string &str_)
@@ -603,34 +785,32 @@ std::string helpers::remove_leading_zeros(const std::string &str_)
     return str_.substr(i);
 }
 
-
 /******************************************************************* */
-bool helpers::reached_end(const int&PC,const int& size)
+bool helpers::reached_end(const int &PC, const int &size)
 {
-    return PC/4>=size;
+    return PC / 4 >= size;
 }
 
-
-   void helpers::delete_break_point(std::vector<int>&b_points,const int& b)
-   {
-        auto it = std::find(b_points.begin(), b_points.end(), b);
-                if (it != b_points.end())
-                {
-                    b_points.erase(it);
-                    std::cout << "deleted break point succesfuly " << std::endl;
-                }
-                else
-                {
-                    std::cout<<"break point not present at that line number "<<std::endl;
-                }
-   }
+void helpers::delete_break_point(std::vector<int> &b_points, const int &b)
+{
+    auto it = std::find(b_points.begin(), b_points.end(), b);
+    if (it != b_points.end())
+    {
+        b_points.erase(it);
+        std::cout << "deleted break point succesfuly " << std::endl;
+    }
+    else
+    {
+        std::cout << "break point not present at that line number " << std::endl;
+    }
+}
 
 std::string helpers::removeLeadingSpaces(const std::string &str)
 {
     size_t start = 0;
-    while (start < str.size() && std::isspace(static_cast<unsigned char>(str[start]))) {
+    while (start < str.size() && std::isspace(static_cast<unsigned char>(str[start])))
+    {
         ++start;
     }
     return str.substr(start);
 }
-

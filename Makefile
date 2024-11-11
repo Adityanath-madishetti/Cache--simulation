@@ -5,7 +5,7 @@ cc2 = g++ -c
 all:  riscv_sim 
 
  riscv_sim: main.o memoryclass.o conversionspace.o Helper.o encoder_functions.o extras.o  libriscv_asm 
-	$(cc) $(cf) main.o memoryclass.o  conversionspace.o Helper.o encoder_functions.o extras.o -L./project_RISC_V -lriscv_asm  -o riscv_sim
+	$(cc)  main.o memoryclass.o  conversionspace.o Helper.o encoder_functions.o extras.o -L./project_RISC_V -lriscv_asm  -o riscv_sim
 
 
 main.o: main.cpp resources.hh
