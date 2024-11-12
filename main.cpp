@@ -152,8 +152,10 @@ int main()
                     reqs[i] = temps;
                     i++;
                 }
+
                 if(cache_is_on)
                     delete CACHE;
+                
                 CACHE = new cache::cache_table(std::stoi(reqs[0]), std::stoi(reqs[1]), std::stoi(reqs[2]), reqs[3], reqs[4]);
             }
 
@@ -164,6 +166,7 @@ int main()
                 {
 
                     delete CACHE;
+                    CACHE=nullptr;
                 }
                 cache_is_on = false;
             }
@@ -231,7 +234,7 @@ int main()
 
                 if (cache_is_on)
                 {
-                    CACHE->invalidate(); // just cleans every thing by marking all valids as not valid
+                    CACHE->invalidate(); // just cleans every thing by marking all valids as not valid and resets stats
                 }
 
                 if (!final_output_vector.empty())

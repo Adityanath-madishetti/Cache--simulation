@@ -758,7 +758,7 @@ void helpers::
 
     if (data_index < 0x0 or data_index >= 0x40001)
     {
-        std::cout<<"hi"<<std::endl;
+        
         throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
     }
 
