@@ -26,7 +26,8 @@ void helpers::cache_stats(cache::cache_table *tab)
 {
     if (tab->HIT_COUNT_ + tab->MISS_COUNT_ == 0)
     {
-        std::cout << "no accesses yet!! " << std::endl;
+        std::cout << "no memory accesses done till now " << std::endl;
+        return;
     }
 
     float hitrate = (float)tab->HIT_COUNT_ / ((float)tab->HIT_COUNT_ + (float)tab->MISS_COUNT_);
@@ -78,6 +79,7 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
 
     if (data_index < 0x0 or data_index + no_of_bytes - 1 >= max)
     {
+        
         throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
     }
 
@@ -118,8 +120,9 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
         if (CACHE->REP_P_ != cache::REPLACEMENT_POLICY::RANDOM) // FIFO // LRU
         {
 
-            if (CACHE->table[cache_set_number].collection[0].change != cache::status::clean)
+            if (CACHE->table[cache_set_number].collection[0].change != cache::status::clean) // cache_to_mem (i.e u need to write into memory the size of block)
             {
+                    // std::cout<<"using replacement policy!!"<<std::endl;
                 uint32_t earlier_tag = CACHE->table[cache_set_number].collection[0].tag_container;
                 int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
                 for (int k = 0; k < std::pow(2, CACHE->NO_OF_OFFSET_BITS_); k++)
@@ -150,6 +153,7 @@ void helpers::mem_to_cache(std::vector<memory::byte> &data_stack__mem, cache::ca
             randomNumber = randomNumber % CACHE->NO_OF_WAYS_;
             if (CACHE->table[cache_set_number].collection[randomNumber].change != cache::status::clean) // handling dirty block replacement
             {
+                                        // std::cout<<"using replacement policy!!"<<std::endl;
                 uint32_t earlier_tag = CACHE->table[cache_set_number].collection[randomNumber].tag_container;
                 int earlier_mem_address = ((earlier_tag << CACHE->NO_OF_INDEX_BITS_) + cache_set_number) << CACHE->NO_OF_OFFSET_BITS_; // !!think
 
@@ -624,6 +628,8 @@ void helpers::
     // identify and distribute to the functions of different formats
 
     // loop runs here and loop has switch cases and break point checking
+        std::ofstream file_name; // for cache;
+     if(cache_is_on) file_name.open(op_file_name,std::ios::app);
 
     while (PC / 4 < Binary_Lines.size())
     {
@@ -634,6 +640,25 @@ void helpers::
         if (!is_step and it != b_points.end()) // break point at present line
         {
             std::cout << "stopped execution due to break point " << std::endl;
+
+        if(cache_is_on)
+        {
+            if (!file_name)
+            {
+                file_name.open(op_file_name,std::ios::app);
+            }
+            for (auto &ele : final_output_vector)
+            {
+                file_name << ele << std::endl;
+            }
+
+            final_output_vector.clear();
+
+            if (file_name.is_open())
+                file_name.close();
+        }
+
+
             break;
         }
 
@@ -681,21 +706,22 @@ void helpers::
 
         if (is_step)
         {
-            if (cache_is_on && PC / 4 == Binary_Lines.size())
+            if (cache_is_on )
             {
-                helpers::cache_stats(CACHE);
+                if(PC == Binary_Lines.size() * 4)
+                     helpers::cache_stats(CACHE);
 
-                std::ofstream file_name(op_file_name);
 
                 if (!file_name)
                 {
-                    throw std::runtime_error("file for output not opened");
+                     file_name.open(op_file_name,std::ios::app);
                 }
                 for (auto &ele : final_output_vector)
                 {
                     file_name << ele << std::endl;
                 }
 
+                final_output_vector.clear();
                 if (file_name.is_open())
                     file_name.close();
             }
@@ -706,16 +732,17 @@ void helpers::
         {
             // !!!!print statistics
             helpers::cache_stats(CACHE);
-            std::ofstream file_name(op_file_name);
 
             if (!file_name)
             {
-                throw std::runtime_error("file for output not opened");
+                file_name.open(op_file_name,std::ios::app);
             }
             for (auto &ele : final_output_vector)
             {
                 file_name << ele << std::endl;
             }
+
+            final_output_vector.clear();
 
             if (file_name.is_open())
                 file_name.close();
@@ -731,6 +758,7 @@ void helpers::
 
     if (data_index < 0x0 or data_index >= 0x40001)
     {
+        std::cout<<"hi"<<std::endl;
         throw std::runtime_error("Accessing unallocated memory! at line_no " + std::to_string(line_no));
     }
 

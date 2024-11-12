@@ -421,7 +421,8 @@ namespace cache
             {
                 this->table[i].clear_association();
             }
-
+            HIT_COUNT_=0;
+            MISS_COUNT_=0;
         }
 
         uint32_t index_find(uint32_t address); // gives set number

@@ -200,9 +200,14 @@ void helpers::
 
             int cache_set_number = CACHE->index_find(actual_address);
 
+
             uint32_t tag = ((actual_address) << 12) >> (12 + CACHE->NO_OF_INDEX_BITS_ + CACHE->NO_OF_OFFSET_BITS_);
+
+
             // std::cout<<cache_set_number<<" "<<tag<<std::endl;
             int line_in_ass = CACHE->table[cache_set_number].find_line(tag);
+
+
             CACHE[cache_set_number];
 
             // if hit (includes validation)
@@ -211,8 +216,13 @@ void helpers::
                 CACHE->HIT_COUNT_++;
                 // take bytes from cache
                 const std::vector<memory::byte> &memory_line = CACHE->table[cache_set_number].collection[line_in_ass].cache_data;
-                int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+
+                // int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+
+                int data_index = actual_address%((int)std::pow(2,CACHE->NO_OF_OFFSET_BITS_));
+
                 helpers::cache_to_register(memory_line, regs[rd], no_of_bytes, data_index, is_signed, PC / 4, CACHE);
+
                 if (CACHE->REP_P_ == cache::REPLACEMENT_POLICY::LRU)
                 {
                     cache::cache_line temp = CACHE->table[cache_set_number].collection[line_in_ass];
@@ -238,8 +248,13 @@ void helpers::
             {
 
                 CACHE->MISS_COUNT_++;
-                int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+                // int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+
+                                int data_index = actual_address%((int)std::pow(2,CACHE->NO_OF_OFFSET_BITS_));
+
+
                 load_to_register(data_stack__mem, regs[rd], no_of_bytes, adress_index, is_signed, PC / 4);
+                
                 helpers::mem_to_cache(data_stack__mem, CACHE, PC / 4, data_index, no_of_bytes, tag, cache_set_number);
 
                 std::stringstream ss;
@@ -389,8 +404,12 @@ std::vector<std::string>&final_output_vector)
         {
             CACHE->HIT_COUNT_++;
             std::vector<memory::byte> &memory_line = CACHE->table[cache_set_number].collection[line_in_ass].cache_data;
-            int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+
+            int data_index =   actual_address%((int)std::pow(2,CACHE->NO_OF_OFFSET_BITS_));
+            // (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+
             helpers::store_in_cache(memory_line, hex_string, no_of_bytes, data_index, PC / 4, CACHE);
+
             if (CACHE->WRITE_P_HIT_ == cache::WRITE_POLICY_HIT::WT)
             {
                 store_in_mem(data__stack_mem, hex_string, no_of_bytes, address_index, PC / 4);
@@ -403,7 +422,7 @@ std::vector<std::string>&final_output_vector)
             /**** writing into vector */
 
             std::stringstream ss;
-            ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: "<<std::hex<<cache_set_number<<std::dec<<", Hit, Tag: "
+            ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: 0x"<<std::hex<<cache_set_number<<std::dec<<", Hit, Tag: "
             << Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_)<<", ";
 
             if(CACHE->table[cache_set_number].collection[line_in_ass].is_clean())
@@ -418,7 +437,10 @@ std::vector<std::string>&final_output_vector)
         else //miss
         {
             CACHE->MISS_COUNT_++;
-            int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+            // int data_index = (actual_address << (32 - CACHE->NO_OF_OFFSET_BITS_)) >> (32 - CACHE->NO_OF_OFFSET_BITS_);
+
+            int data_index = actual_address%((int)std::pow(2,CACHE->NO_OF_OFFSET_BITS_));
+           
             if(CACHE->WRITE_P_MISS_ == cache::WRITE_POLICY_MISS::NA)
             {
                 // std::cout<<"entered in NA"<<std::endl;
@@ -448,7 +470,7 @@ std::vector<std::string>&final_output_vector)
                 }
 
                 std::stringstream ss;
-                ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: "<<std::hex<<cache_set_number<<std::dec<<", Miss, Tag: "
+                ss<<"W: Address: 0x"<<std::hex<<actual_address<<std::dec<<", Set: 0x"<<std::hex<<cache_set_number<<std::dec<<", Miss, Tag: "
                 <<Conversions::print_in_hex_for_tag(tag,CACHE->NO_OF_TAG_BITS_)<<", ";
                 ss<<"Dirty";
 

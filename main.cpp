@@ -8,7 +8,7 @@
 #include <map>
 #include <optional>
 #include <iomanip>
-
+#include <fstream>
 std::vector<std::string> input_collector()
 {
     std::string input;
@@ -129,6 +129,7 @@ int main()
                     }
                 }
             }
+            
 
             else if (input_tokens[0] == "cache_sim" && input_tokens[1] == "enable")
             {
@@ -151,7 +152,8 @@ int main()
                     reqs[i] = temps;
                     i++;
                 }
-
+                if(cache_is_on)
+                    delete CACHE;
                 CACHE = new cache::cache_table(std::stoi(reqs[0]), std::stoi(reqs[1]), std::stoi(reqs[2]), reqs[3], reqs[4]);
             }
 
@@ -229,7 +231,7 @@ int main()
 
                 if (cache_is_on)
                 {
-                    CACHE->invalidate();
+                    CACHE->invalidate(); // just cleans every thing by marking all valids as not valid
                 }
 
                 if (!final_output_vector.empty())
@@ -245,13 +247,28 @@ int main()
                     size_t pos = filename.find_last_of('.');
 
                     if (pos == std::string::npos || pos == 0)
-                        return filename; 
-                  
+                        return filename;
+
                     return filename.substr(0, pos);
                 };
 
                 std::string filename = input_tokens[1];
                 op_file_name = remove_extension(input_tokens[1]) + ".output";
+
+                std::ofstream temp_file;// for cache
+                if (cache_is_on)
+                {
+                    temp_file.open(op_file_name);
+                    if (!temp_file.is_open())
+                    {
+                        temp_file.open(input_tokens[1]);
+                        temp_file.close();
+                    }
+                    else
+                    {
+                        temp_file.close();
+                    }
+                }
 
                 parser P_object(filename, "output.hex");
 
